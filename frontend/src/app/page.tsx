@@ -27,7 +27,7 @@ export default function Home() {
     try {
       const [assetsRes, requestsRes, logsRes] = await Promise.all([
         fetch(`${BACKEND_URL}/api/assets`),
-        fetch(`${BACKENDURL ? BACKEND_URL : ""}/api/requests`), // safety
+        fetch(`${BACKEND_URL ? BACKEND_URL : ""}/api/requests`), // safety
         fetch(`${BACKEND_URL}/api/history`)
       ]);
       

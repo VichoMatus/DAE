@@ -44,7 +44,7 @@ export default function RoleSidebar({
           </div>
           <div>
             <h1 className="font-extrabold text-lg tracking-tight text-white">DAE ACTIVA</h1>
-            <p className="text-xs text-slate-400 font-medium">Prototipo Mínimo Navegable</p>
+            <p className="text-xs text-slate-400 font-medium">Sistema de Control de Activos</p>
           </div>
         </div>
 
@@ -79,7 +79,7 @@ export default function RoleSidebar({
 
       <div className="p-6 border-t border-slate-800 bg-slate-950/40">
         <div className="mb-4">
-          <div className="text-xs text-slate-400 mb-1">Simulación Activa</div>
+          <div className="text-xs text-slate-400 mb-1">Estado de Operaciones</div>
           <div className="text-sm font-semibold text-slate-200">22 de Mayo de 2026</div>
         </div>
         <button
@@ -88,7 +88,7 @@ export default function RoleSidebar({
           className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-slate-900 border border-slate-800 hover:border-slate-700 hover:bg-slate-800 text-slate-300 rounded-xl text-xs font-semibold transition-all"
         >
           <RefreshCw className={`h-3.5 w-3.5 ${isResetting ? "animate-spin" : ""}`} />
-          {isResetting ? "Reiniciando..." : "Reiniciar Simulación"}
+          {isResetting ? "Restableciendo..." : "Restablecer Base de Datos"}
         </button>
       </div>
     </aside>

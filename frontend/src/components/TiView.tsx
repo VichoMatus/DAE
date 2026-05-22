@@ -66,7 +66,7 @@ export default function TiView({
     );
   };
 
-  // Simulate timeout return to Bodega
+  // Timeout return to Bodega
   const handleTimeoutReturn = (qr: string) => {
     onTransitionAsset(
       qr,

@@ -1,6 +1,6 @@
-# Plataforma de Gestión de Activos Tecnológicos - DAE ACTIVA (PMN)
+# Plataforma de Gestión de Activos Tecnológicos - DAE ACTIVA
 
-Este proyecto es un **Prototipo Mínimo Navegable (PMN)** desarrollado como solución para la gestión de activos fijos de hardware. El objetivo primordial es erradicar la "responsabilidad difusa" mediante un control exhaustivo de transiciones de estado inmutables y la aplicación de reglas financieras directas (D1, D2 y D3).
+Esta plataforma es una solución empresarial avanzada desarrollada para la gestión de activos fijos de hardware. El objetivo primordial es erradicar la "responsabilidad difusa" mediante un control exhaustivo de transiciones de estado inmutables y la aplicación de reglas financieras directas (D1, D2 y D3).
 
 ---
 
@@ -21,7 +21,7 @@ El sistema hace un seguimiento de los activos separando explícitamente el **Cus
 2. `En Tránsito (Bodega-TI)` &rarr; Despachado por Bodega (D1)
 3. `En Configuración` &rarr; Recibido físicamente por Técnico
 4. `Listo para Entrega` &rarr; Preparación técnica finalizada
-5. `Pendiente de Recepción Formal` &rarr; Alerta de retiro enviada (con simulación de timeout de retorno automático)
+5. `Pendiente de Recepción Formal` &rarr; Alerta de retiro enviada (con validación de timeout de retorno automático)
 6. `Asignado` &rarr; Colaborador firma acta digital legal
 7. `En Diagnóstico` &rarr; Falla física reportada
 8. `Pendiente de Decisión` &rarr; Retenido por compuerta D2 (Costo reparación > Nuevo O Vida útil < 6 meses)
@@ -36,42 +36,30 @@ El sistema hace un seguimiento de los activos separando explícitamente el **Cus
 
 ## Instrucciones de Ejecución
 
-### 1. Iniciar el Backend (Flask)
-Requisitos: Python 3.8+ instalado.
+La plataforma cuenta con un script de control automatizado (`control.sh`) en la raíz del proyecto para simplificar la instalación e inicio de todos los componentes.
 
-1. Navega al directorio del backend:
-   ```bash
-   cd backend
-   ```
-2. Instala las dependencias:
-   ```bash
-   pip3 install -r requirements.txt
-   ```
-3. Ejecuta el servidor de desarrollo:
-   ```bash
-   python3 app.py
-   ```
-El backend estará disponible en: [http://localhost:5000](http://localhost:5000)
+### 1. Configurar el Proyecto (Instalar dependencias)
+Ejecuta el siguiente comando para crear el entorno virtual de Python, instalar las dependencias del backend y configurar las dependencias del frontend usando el Node.js local:
+```bash
+./control.sh setup
+```
 
----
+### 2. Iniciar Servidores (Backend + Frontend)
+Para arrancar el backend de Flask y el servidor de desarrollo de Next.js en paralelo, ejecuta:
+```bash
+./control.sh start
+```
+Una vez iniciado:
+- **Backend API:** [http://localhost:5000](http://localhost:5000)
+- **Frontend App:** [http://localhost:3000](http://localhost:3000)
 
-### 2. Iniciar el Frontend (Next.js)
-El entorno de Node.js está instalado de forma local en la carpeta `node-env/` del proyecto. Para ejecutar npm/next, debes configurar temporalmente la ruta en tu terminal.
+*Nota: Presiona `Ctrl+C` en la terminal para apagar ambos servidores de forma segura.*
 
-1. Navega al directorio del frontend:
-   ```bash
-   cd frontend
-   ```
-2. Carga la ruta de Node.js local en la terminal e instala dependencias:
-   ```bash
-   export PATH=$(pwd)/../node-env/bin:$PATH
-   npm install
-   ```
-3. Ejecuta el servidor de desarrollo Next.js:
-   ```bash
-   npm run dev
-   ```
-El frontend estará disponible en: [http://localhost:3000](http://localhost:3000)
+### 3. Restablecer Base de Datos (Opcional)
+Si deseas restaurar los activos y transiciones a su estado de fábrica en cualquier momento, con el servidor en ejecución, abre una terminal y ejecuta:
+```bash
+./control.sh reset
+```
 
 ---
 
