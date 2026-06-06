@@ -284,7 +284,7 @@ export default function FinanzasView({
                     </div>
 
                     <button
-                      onClick={() => onFinanceDecision(asset.qr_code, "baja", undefined, `Baja por siniestro (Robo) respaldado por denuncia policial N° ${asset.incident_details?.police_report_num}`)}
+                      onClick={() => onFinanceDecision(asset.qr_code, "baja", undefined, `Baja por siniestro respaldado por denuncia policial N° ${asset.incident_details?.police_report_num}`)}
                       disabled={isLoading}
                       className="w-full py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-lg transition-all"
                     >

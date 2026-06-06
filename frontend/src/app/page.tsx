@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Asset, AllocationRequest, HistoryLog } from "@/types";
 import RoleSidebar from "@/components/RoleSidebar";
 import JefeAreaView from "@/components/JefeAreaView";
@@ -10,11 +11,13 @@ import ColaboradorView from "@/components/ColaboradorView";
 import FinanzasView from "@/components/FinanzasView";
 import SupervisorView from "@/components/SupervisorView";
 import { Activity, ShieldAlert, BadgeAlert } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
-const BACKEND_URL = "http://localhost:5000";
+const API_BASE = "/api";
 
 export default function Home() {
-  const [activeRole, setActiveRole] = useState<string>("Jefe de Área");
+  const router = useRouter();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const [assets, setAssets] = useState<Asset[]>([]);
   const [requests, setRequests] = useState<AllocationRequest[]>([]);
   const [logs, setLogs] = useState<HistoryLog[]>([]);
@@ -26,9 +29,9 @@ export default function Home() {
   const fetchData = useCallback(async () => {
     try {
       const [assetsRes, requestsRes, logsRes] = await Promise.all([
-        fetch(`${BACKEND_URL}/api/assets`),
-        fetch(`${BACKEND_URL ? BACKEND_URL : ""}/api/requests`), // safety
-        fetch(`${BACKEND_URL}/api/history`)
+        fetch(`${API_BASE}/assets`, { credentials: "include" }),
+        fetch(`${API_BASE}/requests`, { credentials: "include" }),
+        fetch(`${API_BASE}/history`, { credentials: "include" })
       ]);
       
       if (assetsRes.ok && requestsRes.ok && logsRes.ok) {
@@ -47,16 +50,25 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (user) {
+      fetchData();
+    }
+  }, [fetchData, user]);
+
+  useEffect(() => {
+    if (!isAuthLoading && !user) {
+      router.replace("/login");
+    }
+  }, [isAuthLoading, router, user]);
 
   // Reset database to initial state
   const handleReset = async () => {
     setIsResetting(true);
     setErrorMsg(null);
     try {
-      const res = await fetch(`${BACKEND_URL}/api/reset`, {
+      const res = await fetch(`${API_BASE}/reset`, {
         method: "POST",
+        credentials: "include",
       });
       if (res.ok) {
         await fetchData();
@@ -72,9 +84,10 @@ export default function Home() {
   const handleCreateRequest = async (data: any) => {
     setIsLoading(true);
     try {
-      const res = await fetch(`${BACKEND_URL}/api/requests`, {
+      const res = await fetch(`${API_BASE}/requests`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify(data)
       });
       if (res.ok) {
@@ -89,6 +102,32 @@ export default function Home() {
     return false;
   };
 
+  // Register new asset from bodega
+  const handleCreateAsset = async (data: any) => {
+    setIsLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/assets`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+
+      const resData = await res.json();
+      if (res.ok) {
+        await fetchData();
+        return { ok: true, status: res.status, asset: resData };
+      }
+
+      return { ok: false, status: res.status, error: resData.error };
+    } catch (e) {
+      console.error("Error creating asset:", e);
+      return { ok: false, status: 500 };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Perform transitions
   const handleTransitionAsset = async (
     qr: string,
@@ -101,9 +140,10 @@ export default function Home() {
     setIsLoading(true);
     setErrorMsg(null);
     try {
-      const res = await fetch(`${BACKEND_URL}/api/assets/${qr}/transition`, {
+      const res = await fetch(`${API_BASE}/assets/${qr}/transition`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ status, emisor, receptor, motivo, request_id: requestId })
       });
       
@@ -128,9 +168,10 @@ export default function Home() {
   const handleDiagnoseAsset = async (qr: string, repairCost: number) => {
     setIsLoading(true);
     try {
-      const res = await fetch(`${BACKEND_URL}/api/assets/${qr}/diagnose`, {
+      const res = await fetch(`${API_BASE}/assets/${qr}/diagnose`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ repair_cost: repairCost, emisor: "Técnico TI" })
       });
       
@@ -156,9 +197,10 @@ export default function Home() {
   ) => {
     setIsLoading(true);
     try {
-      const res = await fetch(`${BACKEND_URL}/api/assets/${qr}/finance-decision`, {
+      const res = await fetch(`${API_BASE}/assets/${qr}/finance-decision`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ action, justification, motivo, emisor: "Finanzas DAE" })
       });
       if (res.ok) {
@@ -181,9 +223,10 @@ export default function Home() {
   const handleReportIncident = async (qr: string, policeReportNum: string, description: string) => {
     setIsLoading(true);
     try {
-      const res = await fetch(`${BACKEND_URL}/api/assets/${qr}/incident`, {
+      const res = await fetch(`${API_BASE}/assets/${qr}/incident`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ police_report_num: policeReportNum, description, emisor: "Colaborador" })
       });
       if (res.ok) {
@@ -201,12 +244,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-slate-950 flex">
       {/* Sidebar navigation */}
-      <RoleSidebar
-        currentRole={activeRole}
-        setRole={setActiveRole}
-        onReset={handleReset}
-        isResetting={isResetting}
-      />
+      <RoleSidebar onReset={handleReset} isResetting={isResetting} />
 
       {/* Main container */}
       <main className="flex-1 ml-80 min-h-screen p-8 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-violet-950/20 via-slate-950 to-slate-950">
@@ -227,21 +265,21 @@ export default function Home() {
             </div>
             
             <div className="text-xs text-slate-500 font-semibold px-2.5 py-1 bg-violet-600/15 border border-violet-500/20 rounded text-violet-400">
-              Rol Activo: {activeRole}
+              Rol Activo: {user?.role ?? "-"}
             </div>
           </div>
         </header>
 
         {/* Dynamic View Selector */}
         <div className="transition-all duration-300">
-          {isLoading && assets.length === 0 ? (
+          {(isAuthLoading || (isLoading && assets.length === 0)) ? (
             <div className="flex flex-col items-center justify-center py-32 space-y-4">
               <Activity className="h-10 w-10 text-violet-400 animate-spin" />
               <p className="text-sm text-slate-400 font-medium">Estableciendo conexión y cargando datos...</p>
             </div>
           ) : (
             <>
-              {activeRole === "Jefe de Área" && (
+              {user?.role === "jefe_area" && (
                 <JefeAreaView
                   assets={assets}
                   requests={requests}
@@ -251,10 +289,11 @@ export default function Home() {
                 />
               )}
 
-              {activeRole === "Encargado de Bodega" && (
+              {user?.role === "bodega" && (
                 <BodegaView
                   assets={assets}
                   requests={requests}
+                  onCreateAsset={handleCreateAsset}
                   onTransitionAsset={handleTransitionAsset}
                   errorMsg={errorMsg}
                   setErrorMsg={setErrorMsg}
@@ -262,7 +301,7 @@ export default function Home() {
                 />
               )}
 
-              {activeRole === "Técnico TI" && (
+              {user?.role === "ti" && (
                 <TiView
                   assets={assets}
                   onTransitionAsset={handleTransitionAsset}
@@ -271,7 +310,7 @@ export default function Home() {
                 />
               )}
 
-              {activeRole === "Colaborador" && (
+              {user?.role === "colaborador" && (
                 <ColaboradorView
                   assets={assets}
                   onTransitionAsset={handleTransitionAsset}
@@ -280,7 +319,7 @@ export default function Home() {
                 />
               )}
 
-              {activeRole === "Finanzas" && (
+              {user?.role === "finanzas" && (
                 <FinanzasView
                   assets={assets}
                   logs={logs}
@@ -289,7 +328,7 @@ export default function Home() {
                 />
               )}
 
-              {activeRole === "Auditoría / Supervisor" && (
+              {user?.role === "auditor" && (
                 <SupervisorView
                   assets={assets}
                   logs={logs}

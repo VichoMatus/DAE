@@ -63,6 +63,48 @@ Si deseas restaurar los activos y transiciones a su estado de fábrica en cualqu
 
 ---
 
+## Autenticación y Usuarios de Prueba
+
+El backend usa autenticación por sesión con cookies. El flujo es el siguiente:
+
+1. El frontend hace `POST` a `/api/auth/login` con `username` y `password`.
+2. Flask valida las credenciales y responde con una cookie de sesión.
+3. Las llamadas posteriores a `/api/assets`, `/api/requests`, `/api/history` y las demás rutas protegidas reutilizan esa sesión.
+4. Para que esto funcione desde el navegador, el frontend usa rutas relativas `/api/...` y Next.js redirige esas llamadas al backend de Flask.
+
+### Usuarios de prueba
+
+Todos los usuarios de prueba usan la misma contraseña:
+
+```text
+demo1234
+```
+
+| Usuario | Rol |
+| --- | --- |
+| `jefe_gomez` | `jefe_area` |
+| `bodega_silva` | `bodega` |
+| `ti_morales` | `ti` |
+| `colab_ramirez` | `colaborador` |
+| `finanzas_vera` | `finanzas` |
+| `auditor_lagos` | `auditor` |
+
+### Ejemplo de login desde PowerShell
+
+```powershell
+$session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+$body = @{ username = 'jefe_gomez'; password = 'demo1234' } | ConvertTo-Json
+
+Invoke-RestMethod -Uri http://localhost:5000/api/auth/login -Method Post -Body $body -ContentType 'application/json' -WebSession $session
+Invoke-RestMethod -Uri http://localhost:5000/api/assets -WebSession $session
+```
+
+### Nota para el frontend
+
+El frontend debe permanecer ejecutándose en `http://localhost:3000` para que el rewrite de Next enrute `/api/:path*` hacia `http://localhost:5000/api/:path*`. Ese ajuste evita problemas de CORS y mantiene la sesión del navegador en un solo origen.
+
+---
+
 ## Compuertas de Decisión Implementadas
 
 1. **D1 (Compatibilidad Técnica):** Valida que la RAM y la categoría correspondan al perfil del cargo del colaborador (ej: programadores requieren Macbook M3 y RAM $\ge 16$ GB; administrativos Dell con $\le 8$ GB).
