@@ -43,6 +43,33 @@ ALLOWED_TRANSITIONS = {
     "Dado de Baja": [],
 }
 
+# Strict role mapping for state transitions
+# Key: (from_status, to_status)
+# Value: set of allowed roles
+TRANSITION_ROLES = {
+    ("En Bodega", "En Tránsito (Bodega-TI)"): {"bodega"},
+    ("En Tránsito (Bodega-TI)", "En Configuración"): {"ti"},
+    ("En Configuración", "Listo para Entrega"): {"ti"},
+    ("Listo para Entrega", "Pendiente de Recepción Formal"): {"ti"},
+    ("Pendiente de Recepción Formal", "Asignado"): {"colaborador"},
+    ("Pendiente de Recepción Formal", "En Bodega"): {"ti"},
+    ("Asignado", "En Diagnóstico"): {"ti", "colaborador"},
+    ("Asignado", "Pendiente de Devolución"): {"jefe_area", "colaborador"},
+    ("Asignado", "Incidente Externo"): {"colaborador"},
+    ("En Diagnóstico", "Pendiente de Decisión"): {"ti"},
+    ("En Diagnóstico", "En Configuración"): {"ti"},
+    ("Pendiente de Decisión", "Dado de Baja"): {"finanzas"},
+    ("Pendiente de Decisión", "Asignado (Extendido)"): {"finanzas"},
+    ("Asignado (Extendido)", "En Diagnóstico"): {"ti", "colaborador"},
+    ("Asignado (Extendido)", "Pendiente de Devolución"): {"jefe_area", "colaborador"},
+    ("Asignado (Extendido)", "Incidente Externo"): {"colaborador"},
+    ("Pendiente de Devolución", "En Validación Técnica"): {"ti"},
+    ("En Validación Técnica", "Disponible para Reasignación"): {"ti"},
+    ("Disponible para Reasignación", "En Bodega"): {"bodega", "ti"},
+    ("Incidente Externo", "Dado de Baja"): {"finanzas"}
+}
+
+
 # Compatibility Matrix for D1
 # Key: Job Profile, Value: dict of compatibility rules
 COMPATIBILITY_MATRIX = {
@@ -230,25 +257,40 @@ def create_asset():
     qr_code = data.get("qr_code", "").strip()
     category = data.get("category", "").strip()
     specs = data.get("specs") or {}
-    original_value = int(data.get("original_value", 0))
     purchase_date = data.get("purchase_date", "")
-    new_equipment_price = int(data.get("new_equipment_price", 0))
-    lifespan_months = int(data.get("lifespan_months", 0))
     warranty_end_date = data.get("warranty_end_date", "")
 
     if not qr_code or not category or not purchase_date or not warranty_end_date:
-        return jsonify({"error": "Faltan campos obligatorios para registrar el activo"}), 400
+        return jsonify({"error": "Faltan campos obligatorios para registrar el activo (QR, categoría, fecha de compra y fecha de garantía)"}), 400
 
-    if Asset.query.filter_by(qr_code=qr_code).first():
-        return jsonify({"error": "El código QR ya está registrado en el sistema"}), 409
+    # Strict type checks and numeric validations
+    try:
+        original_value = int(data.get("original_value"))
+        new_equipment_price = int(data.get("new_equipment_price"))
+        lifespan_months = int(data.get("lifespan_months"))
+    except (ValueError, TypeError, KeyError):
+        return jsonify({"error": "Los campos 'original_value', 'new_equipment_price' y 'lifespan_months' son obligatorios y deben ser números enteros válidos"}), 400
 
     if original_value <= 0 or new_equipment_price <= 0:
-        return jsonify({"error": "Los valores monetarios deben ser mayores a 0"}), 400
+        return jsonify({"error": "Los valores monetarios (valor original y precio nuevo) deben ser números enteros estrictamente mayores a 0"}), 422
+
+    if lifespan_months <= 0:
+        return jsonify({"error": "La vida útil del activo debe ser mayor a 0 meses"}), 422
+
+    if Asset.query.filter_by(qr_code=qr_code).first():
+        return jsonify({"error": f"El código QR '{qr_code}' ya está registrado en el sistema"}), 409
 
     try:
-        datetime.strptime(purchase_date, "%Y-%m-%d")
+        p_date = datetime.strptime(purchase_date, "%Y-%m-%d")
+        if p_date > datetime.now():
+            return jsonify({"error": "La fecha de compra no puede ser una fecha futura"}), 422
     except ValueError:
-        return jsonify({"error": "Formato de fecha inválido. Use YYYY-MM-DD"}), 400
+        return jsonify({"error": "Formato de fecha de compra inválido. Use YYYY-MM-DD"}), 400
+
+    try:
+        datetime.strptime(warranty_end_date, "%Y-%m-%d")
+    except ValueError:
+        return jsonify({"error": "Formato de fecha de garantía inválido. Use YYYY-MM-DD"}), 400
 
     asset = Asset(
         qr_code=qr_code,
@@ -302,12 +344,25 @@ def transition_asset(qr_code):
     motivo = data.get("motivo", "")
     request_id = data.get("request_id")
 
+    if not target_status:
+        return jsonify({"error": "El campo 'status' es obligatorio"}), 400
+
     current_status = asset.status
+
+    # Strict transition route validation
     allowed = ALLOWED_TRANSITIONS.get(current_status, [])
     if target_status not in allowed:
         return jsonify({
-            "error": f"Transición no permitida de '{current_status}' a '{target_status}'. Pasos no pueden saltarse."
+            "error": f"Transición no permitida de '{current_status}' a '{target_status}'. Los pasos del ciclo de vida no pueden saltarse."
         }), 400
+
+    # Strict user role validation per transition route
+    user_role = session.get('role')
+    allowed_roles = TRANSITION_ROLES.get((current_status, target_status))
+    if allowed_roles and user_role not in allowed_roles:
+        return jsonify({
+            "error": f"Acceso denegado. Tu rol de '{user_role}' no tiene autorización para realizar la transición de '{current_status}' a '{target_status}'."
+        }), 403
 
     if current_status == "En Bodega" and target_status == "En Tránsito (Bodega-TI)":
         if request_id:
@@ -345,10 +400,27 @@ def diagnose_asset(qr_code):
     if error_response:
         return error_response
 
-    data = request.json or {}
-    repair_cost = int(data.get("repair_cost", 0))
-    emisor = data.get("emisor", "Técnico")
+    # Strict state validation
+    if asset.status != "En Diagnóstico":
+        return jsonify({
+            "error": f"Operación no permitida. El activo '{qr_code}' debe estar en estado 'En Diagnóstico' para evaluar su reparación. Estado actual: '{asset.status}'."
+        }), 400
 
+    data = request.json or {}
+    
+    # Strict validation of input types and presence
+    if not data or "repair_cost" not in data:
+        return jsonify({"error": "El campo 'repair_cost' es obligatorio para evaluar el diagnóstico"}), 400
+
+    try:
+        repair_cost = int(data["repair_cost"])
+    except (ValueError, TypeError):
+        return jsonify({"error": "El costo de reparación debe ser un número entero válido"}), 400
+
+    if repair_cost < 0:
+        return jsonify({"error": "El costo de reparación no puede ser un valor negativo"}), 422
+
+    emisor = data.get("emisor", "Técnico")
     asset.repair_cost = repair_cost
     asset.previous_failures_count = (asset.previous_failures_count or 0) + 1
     current_date = data.get("date", "2026-05-22")
@@ -403,8 +475,11 @@ def finance_decision(qr_code):
     emisor = data.get("emisor", "Finanzas")
     motivo = data.get("motivo", "")
 
+    if not action:
+        return jsonify({"error": "El campo 'action' es obligatorio"}), 400
+
     if asset.status not in {"Pendiente de Decisión", "Incidente Externo"}:
-        return jsonify({"error": "El activo no está en estado Pendiente de Decisión"}), 400
+        return jsonify({"error": f"El activo '{qr_code}' no se encuentra en un estado apto para decisiones de Finanzas (Pendiente de Decisión o Incidente Externo). Estado actual: '{asset.status}'"}), 400
 
     previous_status = asset.status
 
@@ -412,6 +487,7 @@ def finance_decision(qr_code):
         asset.status = "Dado de Baja"
         asset.custodio_fisico = "Ninguno (Dado de Baja)"
         asset.responsable_administrativo = "Finanzas DAE (Baja Contable)"
+        asset.assigned_to = None
 
         if previous_status == "Incidente Externo":
             motivo_baja = f"Baja contable y física autorizada por Finanzas para siniestro: {motivo}"
@@ -431,40 +507,39 @@ def finance_decision(qr_code):
 
     if action == "extension":
         if previous_status == "Incidente Externo":
-            return jsonify({"error": "Un activo siniestrado solo puede ser dado de baja, no extendido"}), 400
+            return jsonify({"error": "Un activo en estado de Incidente Externo solo puede ser dado de baja, no extendido"}), 400
 
         battery_wear = asset.battery_wear_pct
         failures = asset.previous_failures_count
 
-        if battery_wear >= 30 or failures >= 3:
+        # Strictly check limits for D3 (battery wear > 30 or failures > 3)
+        if battery_wear > 30 or failures > 3:
             warnings = []
-            if battery_wear >= 30:
-                warnings.append(f"Desgaste de batería es {battery_wear}% (Límite: <30%)")
-            if failures >= 3:
-                warnings.append(f"Conteo de fallas previas es {failures} (Límite: <3)")
+            if battery_wear > 30:
+                warnings.append(f"desgaste de batería es {battery_wear}% (Límite: <=30%)")
+            if failures > 3:
+                warnings.append(f"conteo de fallas previas es {failures} (Límite: <=3)")
 
-            justification = data.get("justification", "")
-            if not justification:
+            justificacion_contable = data.get("justificacion_contable", "").strip()
+            if not justificacion_contable:
                 return jsonify({
-                    "error": f"Falla D3: Criterio de extensión excedido ({', '.join(warnings)}). Se requiere justificación excepcional obligatoria de Finanzas."
-                }), 400
+                    "error": f"Falla D3: Criterio de extensión excedido ({', '.join(warnings)}). Se requiere justificación contable excepcional obligatoria de Finanzas."
+                }), 422
+            
+            # Require minimum 20 characters
+            if len(justificacion_contable) < 20:
+                return jsonify({
+                    "error": f"Falla D3: La justificación contable de excepción extraordinaria debe contener al menos 20 caracteres para tener validez de auditoría. Longitud actual: {len(justificacion_contable)} caracteres."
+                }), 422
 
-            motivo = f"Aprobado con Excepción Especial D3. {', '.join(warnings)}. Justificación: {justification}"
+            motivo = f"Aprobado con Excepción Especial D3. {', '.join(warnings)}. Justificación: {justificacion_contable}"
         else:
-            motivo = f"Aprobado bajo parámetros D3 estándar: Desgaste batería ({battery_wear}%) < 30%, Fallas ({failures}) < 3."
+            motivo = f"Aprobado bajo parámetros D3 estándar: Desgaste batería ({battery_wear}%) <= 30%, Fallas ({failures}) <= 3."
 
         asset.status = "Asignado (Extendido)"
         asset.extension_months = 12
         asset.custodio_fisico = f"Colaborador: {asset.assigned_to}"
         asset.responsable_administrativo = f"Colaborador: {asset.assigned_to}"
-
-        extension_motivo = motivo
-        if battery_wear >= 30 or failures >= 3:
-            extension_motivo = f"Aprobado con Excepción Especial D3. {', '.join(warnings)}. Justificación: {justification}"
-        else:
-            extension_motivo = (
-                f"Aprobado bajo parámetros D3 estándar: Desgaste batería ({battery_wear}%) < 30%, Fallas ({failures}) < 3."
-            )
 
         _append_log(
             asset,
@@ -472,12 +547,12 @@ def finance_decision(qr_code):
             "Asignado (Extendido)",
             emisor,
             f"Colaborador: {asset.assigned_to}",
-            extension_motivo,
+            motivo,
         )
         db.session.commit()
         return jsonify({"success": True, "asset": asset.to_dict()})
 
-    return jsonify({"error": "Acción financiera no reconocida"}), 400
+    return jsonify({"error": f"Acción financiera '{action}' no reconocida"}), 400
 
 
 @app.route('/api/assets/<qr_code>/incident', methods=['POST'])

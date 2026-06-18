@@ -19,7 +19,7 @@ import AssetHistory from "./AssetHistory";
 interface FinanzasViewProps {
   assets: Asset[];
   logs: HistoryLog[];
-  onFinanceDecision: (qr: string, action: "baja" | "extension", justification?: string, motivo?: string) => Promise<boolean>;
+  onFinanceDecision: (qr: string, action: "baja" | "extension", justificacion_contable?: string, motivo?: string) => Promise<boolean>;
   isLoading: boolean;
 }
 
@@ -46,7 +46,7 @@ export default function FinanzasView({
     if (!asset) return;
 
     if (action === "extension") {
-      const needsJustification = asset.battery_wear_pct >= 30 || asset.previous_failures_count >= 3;
+      const needsJustification = asset.battery_wear_pct > 30 || asset.previous_failures_count > 3;
       const just = justifications[qr] || "";
       
       if (needsJustification && !just.trim()) {
@@ -103,7 +103,7 @@ export default function FinanzasView({
             ) : (
               <div className="space-y-6">
                 {decisionAssets.map((asset) => {
-                  const needsJustification = asset.battery_wear_pct >= 30 || asset.previous_failures_count >= 3;
+                  const needsJustification = asset.battery_wear_pct > 30 || asset.previous_failures_count > 3;
                   const justText = justifications[asset.qr_code] || "";
                   
                   return (
@@ -155,14 +155,14 @@ export default function FinanzasView({
                         <div className="grid grid-cols-2 gap-4 text-[11px]">
                           <div className="flex justify-between">
                             <span className="text-slate-500">Desgaste Batería:</span>
-                            <span className={`font-semibold ${asset.battery_wear_pct >= 30 ? "text-rose-400" : "text-emerald-400"}`}>
-                              {asset.battery_wear_pct}% {asset.battery_wear_pct >= 30 ? "(Excede 30%)" : "(Óptimo)"}
+                            <span className={`font-semibold ${asset.battery_wear_pct > 30 ? "text-rose-400" : "text-emerald-400"}`}>
+                              {asset.battery_wear_pct}% {asset.battery_wear_pct > 30 ? "(Excede 30%)" : "(Óptimo)"}
                             </span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-slate-500">Fallas Previas:</span>
-                            <span className={`font-semibold ${asset.previous_failures_count >= 3 ? "text-rose-400" : "text-emerald-400"}`}>
-                              {asset.previous_failures_count} {asset.previous_failures_count >= 3 ? "(Excede 3)" : "(Frecuencia Baja)"}
+                            <span className={`font-semibold ${asset.previous_failures_count > 3 ? "text-rose-400" : "text-emerald-400"}`}>
+                              {asset.previous_failures_count} {asset.previous_failures_count > 3 ? "(Excede 3)" : "(Frecuencia Baja)"}
                             </span>
                           </div>
                         </div>

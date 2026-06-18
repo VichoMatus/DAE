@@ -42,8 +42,12 @@ export default function AssetHistory({ logs, assetQr }: AssetHistoryProps) {
 
   if (sortedLogs.length === 0) {
     return (
-      <div className="text-center py-8 text-slate-500 text-sm">
-        No hay registros de transiciones en el historial inmutable.
+      <div className="p-6 bg-slate-900/10 border border-slate-800 border-dashed rounded-xl text-center space-y-2">
+        <ShieldCheck className="h-8 w-8 text-emerald-400 mx-auto opacity-75" />
+        <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider">Activo recién ingresado al inventario</h4>
+        <p className="text-[11px] text-slate-400 max-w-md mx-auto leading-relaxed">
+          Este equipo no posee historial de trazabilidad anterior. Su registro inicial ha sido guardado de forma inmutable y está listo para comenzar su ciclo de vida.
+        </p>
       </div>
     );
   }

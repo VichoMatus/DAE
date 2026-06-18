@@ -31,7 +31,7 @@ export default function TiView({
   isLoading
 }: TiViewProps) {
   const [repairCosts, setRepairCosts] = useState<Record<string, string>>({});
-  const [d2Result, setD2Result] = useState<Record<string, { type: "success" | "warning"; text: string }>>({});
+  const [d2Result, setD2Result] = useState<Record<string, { type: "success" | "warning" | "error"; text: string }>>({});
 
   // Confirm receipt of asset sent by Bodega
   const handleConfirmReceipt = (qr: string) => {
@@ -130,13 +130,14 @@ export default function TiView({
     }
 
     const res = await onDiagnoseAsset(qr, cost);
-    if (res) {
-      if (res.decision === "Pendiente de Decisión") {
+    if (res && res.ok) {
+      const data = res.data;
+      if (data.decision === "Pendiente de Decisión") {
         setD2Result(prev => ({
           ...prev,
           [qr]: {
             type: "warning",
-            text: `Bloqueo D2 Excedido: ${res.reason}. El activo ha sido enviado al panel de Finanzas para dictaminar su baja.`
+            text: `Bloqueo D2 Excedido: ${data.reason}. El activo ha sido enviado al panel de Finanzas para dictaminar su baja.`
           }
         }));
       } else {
@@ -144,10 +145,19 @@ export default function TiView({
           ...prev,
           [qr]: {
             type: "success",
-            text: `Autorizado D2: ${res.reason}. Reparación autorizada debido a costos moderados y vida útil remanente óptima.`
+            text: `Autorizado D2: ${data.reason}. Reparación autorizada debido a costos moderados y vida útil remanente óptima.`
           }
         }));
       }
+    } else {
+      const errMsg = res?.error || "Error al registrar el diagnóstico del activo.";
+      setD2Result(prev => ({
+        ...prev,
+        [qr]: {
+          type: "error",
+          text: `Fallo en Diagnóstico: ${errMsg}`
+        }
+      }));
     }
   };
 

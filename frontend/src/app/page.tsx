@@ -157,7 +157,7 @@ export default function Home() {
       }
     } catch (e) {
       console.error("Error performing transition:", e);
-      setErrorMsg("No se pudo establecer conexión con el backend Flask.");
+      setErrorMsg("Error de red: No se pudo establecer conexión con el backend.");
       return false;
     } finally {
       setIsLoading(false);
@@ -167,6 +167,7 @@ export default function Home() {
   // Evaluate repair D2
   const handleDiagnoseAsset = async (qr: string, repairCost: number) => {
     setIsLoading(true);
+    setErrorMsg(null);
     try {
       const res = await fetch(`${API_BASE}/assets/${qr}/diagnose`, {
         method: "POST",
@@ -178,50 +179,58 @@ export default function Home() {
       const resData = await res.json();
       if (res.ok) {
         await fetchData();
-        return resData;
+        return { ok: true, data: resData };
+      } else {
+        const errMsg = resData.error || "Error al registrar el diagnóstico del activo.";
+        setErrorMsg(errMsg);
+        return { ok: false, error: errMsg };
       }
     } catch (e) {
       console.error("Error diagnosing asset:", e);
+      setErrorMsg("Error de red: No se pudo conectar con el servidor.");
+      return { ok: false, error: "Error de red: No se pudo conectar con el servidor." };
     } finally {
       setIsLoading(false);
     }
-    return null;
   };
 
   // Finance Decision D3 (Baja / Extension)
   const handleFinanceDecision = async (
     qr: string,
     action: "baja" | "extension",
-    justification?: string,
+    justificacion_contable?: string,
     motivo?: string
   ) => {
     setIsLoading(true);
+    setErrorMsg(null);
     try {
       const res = await fetch(`${API_BASE}/assets/${qr}/finance-decision`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ action, justification, motivo, emisor: "Finanzas DAE" })
+        body: JSON.stringify({ action, justificacion_contable, motivo, emisor: "Finanzas DAE" })
       });
+      const resData = await res.json();
       if (res.ok) {
         await fetchData();
         return true;
       } else {
-        const resData = await res.json();
-        alert(resData.error || "Error al procesar decisión financiera");
+        setErrorMsg(resData.error || "Error al procesar la decisión financiera");
         return false;
       }
     } catch (e) {
       console.error("Error in finance decision:", e);
+      setErrorMsg("Error de red: No se pudo conectar con el servidor.");
+      return false;
     } finally {
       setIsLoading(false);
     }
-    return false;
   };
 
   // Report external incident
   const handleReportIncident = async (qr: string, policeReportNum: string, description: string) => {
     setIsLoading(true);
+    setErrorMsg(null);
     try {
       const res = await fetch(`${API_BASE}/assets/${qr}/incident`, {
         method: "POST",
@@ -229,16 +238,21 @@ export default function Home() {
         credentials: "include",
         body: JSON.stringify({ police_report_num: policeReportNum, description, emisor: "Colaborador" })
       });
+      const resData = await res.json();
       if (res.ok) {
         await fetchData();
         return true;
+      } else {
+        setErrorMsg(resData.error || "Error al registrar el incidente");
+        return false;
       }
     } catch (e) {
       console.error("Error reporting incident:", e);
+      setErrorMsg("Error de red: No se pudo conectar con el servidor.");
+      return false;
     } finally {
       setIsLoading(false);
     }
-    return false;
   };
 
   return (
@@ -269,6 +283,22 @@ export default function Home() {
             </div>
           </div>
         </header>
+
+        {errorMsg && (
+          <div className="mb-6 p-4 rounded-xl border border-rose-500/30 bg-rose-950/25 text-rose-200 flex items-start gap-3 animate-fade-in shadow-lg shadow-rose-950/10">
+            <ShieldAlert className="h-5 w-5 text-rose-400 mt-0.5 shrink-0 animate-bounce" />
+            <div className="flex-1 text-xs">
+              <strong className="font-semibold block mb-0.5 text-rose-300">Operación Rechazada</strong>
+              {errorMsg}
+            </div>
+            <button 
+              onClick={() => setErrorMsg(null)}
+              className="text-rose-400 hover:text-rose-300 text-xs font-bold px-2 py-1 hover:bg-rose-500/10 rounded transition-all"
+            >
+              Cerrar
+            </button>
+          </div>
+        )}
 
         {/* Dynamic View Selector */}
         <div className="transition-all duration-300">

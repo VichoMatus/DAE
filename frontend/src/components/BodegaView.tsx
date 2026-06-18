@@ -43,6 +43,33 @@ export default function BodegaView({
   const pendingRequests = requests.filter(r => r.status === "Pendiente");
   const stockAssets = assets.filter(a => a.status === "En Bodega" || a.status === "Disponible para Reasignación");
 
+  const currentDateStr = React.useMemo(() => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }, []);
+
+  const isFormInvalid = React.useMemo(() => {
+    const originalValueNum = Number(createForm.original_value);
+    const newEquipmentPriceNum = Number(createForm.new_equipment_price);
+    const lifespanMonthsNum = Number(createForm.lifespan_months);
+
+    return (
+      originalValueNum <= 0 ||
+      newEquipmentPriceNum <= 0 ||
+      lifespanMonthsNum <= 0 ||
+      isNaN(originalValueNum) ||
+      isNaN(newEquipmentPriceNum) ||
+      isNaN(lifespanMonthsNum) ||
+      !createForm.qr_code.trim() ||
+      !createForm.purchase_date ||
+      !createForm.warranty_end_date ||
+      createForm.purchase_date > currentDateStr
+    );
+  }, [createForm, currentDateStr]);
+
   const handleCreateAsset = async (event: React.FormEvent) => {
     event.preventDefault();
     setCreateMsg(null);
@@ -232,6 +259,7 @@ export default function BodegaView({
                 <input
                   type="date"
                   value={createForm.purchase_date}
+                  max={currentDateStr}
                   onChange={(e) => setCreateForm((prev) => ({ ...prev, purchase_date: e.target.value }))}
                   className="w-full text-xs py-2.5 px-3 bg-slate-950/60 border border-slate-800 text-slate-200 rounded-lg outline-none focus:border-emerald-500"
                 />
@@ -260,8 +288,8 @@ export default function BodegaView({
 
             <button
               type="submit"
-              disabled={isLoading}
-              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-all"
+              disabled={isLoading || isFormInvalid}
+              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:hover:bg-emerald-600 text-white rounded-lg text-xs font-bold transition-all"
             >
               <PlusCircle className="h-4 w-4" />
               Registrar en Sistema
